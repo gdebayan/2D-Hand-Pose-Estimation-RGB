@@ -1,5 +1,6 @@
 import numpy as np
 import torch
+import os
 
 
 class Trainer:
@@ -18,6 +19,8 @@ class Trainer:
         self.early_stopping_avg = 10
         self.early_stopping_precision = 5
         self.ckpt_save_path = '../checkpoints'
+
+        os.makedirs(self.ckpt_save_path, exist_ok=True)
 
 
     def train(self, train_dataloader, val_dataloader, load_chkpt=None):
@@ -50,7 +53,7 @@ class Trainer:
             #     torch.save(
             #         self.model.state_dict(), "model_{}".format(str(epoch + 1).zfill(3))
             #     )
-            sace_path = f"{self.ckpt_save_path}/epoch_{epoch}"
+            save_path = f"{self.ckpt_save_path}/epoch_{epoch}"
             
             torch.save({
             'epoch': epoch,
