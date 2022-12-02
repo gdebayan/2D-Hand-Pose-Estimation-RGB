@@ -25,14 +25,19 @@ class Trainer:
 
     def train(self, train_dataloader, val_dataloader, load_chkpt=None):
         
+        start_epoch = 0
+
         if load_chkpt:
-             checkpoint = torch.load(load_chkpt)
-             self.model.load_state_dict(checkpoint['model_state_dict'])
-             self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-             if self.scheduler:
+            checkpoint = torch.load(load_chkpt)
+            self.model.load_state_dict(checkpoint['model_state_dict'])
+            self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+            if self.scheduler:
                 self.scheduler.load(checkpoint['scheduler_state_dict'])
 
-        for epoch in range(self.epochs):
+            start_epoch = checkpoint['epoch'] + 1
+
+
+        for epoch in range(start_epoch, self.epochs):
             self._epoch_train(train_dataloader)
             self._epoch_eval(val_dataloader)
             print(
