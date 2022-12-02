@@ -20,7 +20,15 @@ class Trainer:
         self.ckpt_save_path = '../checkpoints'
 
 
-    def train(self, train_dataloader, val_dataloader):
+    def train(self, train_dataloader, val_dataloader, load_chkpt=None):
+        
+        if load_chkpt:
+             checkpoint = torch.load(load_chkpt)
+             self.model.load_state_dict(checkpoint['model_state_dict'])
+             self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+             if self.scheduler:
+                self.scheduler.load(checkpoint['scheduler_state_dict'])
+
         for epoch in range(self.epochs):
             self._epoch_train(train_dataloader)
             self._epoch_eval(val_dataloader)
