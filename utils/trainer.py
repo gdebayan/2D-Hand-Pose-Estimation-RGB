@@ -13,10 +13,12 @@ class Trainer:
         self.batches_per_epoch_val = config["batches_per_epoch_val"]
         self.device = config["device"]
         self.scheduler = scheduler
-        self.checkpoint_frequency = 100
+        self.checkpoint_frequency = 1
         self.early_stopping_epochs = 10
         self.early_stopping_avg = 10
         self.early_stopping_precision = 5
+        self.ckpt_save_path = '../checkpoints'
+
 
     def train(self, train_dataloader, val_dataloader):
         for epoch in range(self.epochs):
@@ -36,10 +38,20 @@ class Trainer:
                 self.scheduler.step(self.loss["train"][-1])
 
             # saving model
-            if (epoch + 1) % self.checkpoint_frequency == 0:
-                torch.save(
-                    self.model.state_dict(), "model_{}".format(str(epoch + 1).zfill(3))
-                )
+            # if (epoch + 1) % self.checkpoint_frequency == 0:
+            #     torch.save(
+            #         self.model.state_dict(), "model_{}".format(str(epoch + 1).zfill(3))
+            #     )
+            sace_path = f"{self.ckpt_save_path}/epoch_{epoch}"
+            
+            torch.save({
+            'epoch': epoch,
+            'model_state_dict': self.model.state_dict(),
+            'optimizer_state_dict': self.optimizer.state_dict(),
+            'scheduler_state_dict': self.scheduler.state_dict(),
+            'train_loss_list': self.loss["train"],
+            'val_loss_list':self.loss["val"]
+            },  save_path)
 
             # early stopping
             if epoch < self.early_stopping_avg:
