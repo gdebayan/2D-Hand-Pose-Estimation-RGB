@@ -3,6 +3,7 @@ import torch
 from torch.utils.data import DataLoader
 import torch.optim as optim
 import torch.nn as nn
+import torch.nn.utils.prune as prune
 
 import sys
 sys.path.append("../")
@@ -10,6 +11,8 @@ sys.path.append("../")
 from utils.dataset import FreiHAND
 from utils.model import ShallowUNet
 from utils.trainer import Trainer
+from utils.prune_utils import PruneUtils
+
 from utils.prep_utils import (
     blur_heatmaps,
     IoULoss,
@@ -19,6 +22,7 @@ from utils.prep_utils import (
     get_norm_params,
     show_data,
 )
+
 
 config = {
     "data_dir": "../data/",
@@ -51,5 +55,22 @@ scheduler = optim.lr_scheduler.ReduceLROnPlateau(
     optimizer=optimizer, factor=0.5, patience=20, verbose=True, threshold=0.00001
 )
 
-trainer = Trainer(model, criterion, optimizer, config, scheduler)
-model = trainer.train(train_dataloader, val_dataloader) 
+
+prune_cls = PruneUtils()
+
+# trainer = Trainer(model, criterion, optimizer, config, scheduler)
+# model = trainer.train(train_dataloader, val_dataloader, '/home/ubuntu/project/2D-Hand-Pose-Estimation-RGB/checkpoints/epoch_1') 
+
+# for name, module in model.named_modules():
+
+#     if isinstance(module, torch.nn.Conv2d):
+#         prune.l1_unstructured(module, name='weight', amount=0.2)
+#         prune.remove(module, 'weight')
+
+model_sparse = prune_cls.apply_sparsity_layer_wise(model=model, sparsity_level=0.2, prune_type='l1', permanent_prune_remove=True)
+
+print('--named buffers --', dict(model_sparse.named_buffers()).keys())
+print("\n\n\n")
+print('--named_parameters --', dict(model_sparse.named_parameters()).keys())
+
+# print("weig",model_sparse.conv_down1.double_conv[1].weight)
