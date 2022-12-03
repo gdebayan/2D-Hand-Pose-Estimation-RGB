@@ -4,7 +4,7 @@ import os
 
 
 class Trainer:
-    def __init__(self, model, criterion, optimizer, config, scheduler=None):
+    def __init__(self, model, criterion, optimizer, config, ckpt_save_path='../checkpoints', scheduler=None):
         self.model = model
         self.criterion = criterion
         self.optimizer = optimizer
@@ -18,7 +18,7 @@ class Trainer:
         self.early_stopping_epochs = 10
         self.early_stopping_avg = 10
         self.early_stopping_precision = 5
-        self.ckpt_save_path = '../checkpoints'
+        self.ckpt_save_path = ckpt_save_path
 
         os.makedirs(self.ckpt_save_path, exist_ok=True)
 
@@ -53,11 +53,7 @@ class Trainer:
             if self.scheduler is not None:
                 self.scheduler.step(self.loss["train"][-1])
 
-            # saving model
-            # if (epoch + 1) % self.checkpoint_frequency == 0:
-            #     torch.save(
-            #         self.model.state_dict(), "model_{}".format(str(epoch + 1).zfill(3))
-            #     )
+
             save_path = f"{self.ckpt_save_path}/epoch_{epoch}"
             
             torch.save({

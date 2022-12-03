@@ -1,5 +1,7 @@
+import torch
 import torch.nn as nn
 import torch.nn.utils.prune as prune
+import re
 
 class PruneUtils:
 
@@ -83,7 +85,7 @@ class PruneUtils:
                                                                              module_types=module_types, 
                                                                              prefix_name='model')
         prune.global_unstructured(parameters_to_prune,
-                                  pruning_method=prune.L1Unstructured,
+                                  pruning_method=prune_type_dict[prune_type],
                                   amount=sparsity_level)
 
         if permanent_prune_remove:
@@ -93,3 +95,54 @@ class PruneUtils:
 
         return model
 
+
+class SparsityCalculator:
+
+    def __init__(self):
+        pass
+
+    @staticmethod
+    def process_name(name, model_var_name):
+
+        search_regexp = re.compile('\.\d\.')  
+        iterator = search_regexp.finditer(name)
+        name_rename = list(name)
+        for match in iterator:
+            st, end = match.span()
+            name_rename[int(st)] = '['
+            name_rename[int(end)-1] = '].'
+        name_rename = ''.join(name_rename)
+
+        name_rename = name_rename.replace('_orig', '')
+
+        return f"{model_var_name}.{name_rename}"
+        
+    @staticmethod
+    def calculate_sparsity_pruned_model(model):
+
+        layer_wise_sparsity = {}
+
+        num_sparse_elem = 0
+        num_elem = 0
+
+        tot_elem_sparse = 0
+
+        for name, weight in model.named_parameters():
+            name_processed = SparsityCalculator.process_name(name, "model")
+            tens_weight = eval(name_processed)
+
+            curr_n_elem = tens_weight.nelement()
+            curr_sparse_elem = torch.sum(tens_weight == 0).item()
+
+            layer_wise_sparsity[name_processed] = (curr_sparse_elem * 100.0)/curr_n_elem
+
+            num_sparse_elem += curr_sparse_elem
+            num_elem += curr_n_elem
+
+            if curr_sparse_elem > 0:
+                tot_elem_sparse += curr_n_elem
+
+        tot_sparsity = num_sparse_elem / num_elem
+        tot_sparsity_pruned_layers = num_sparse_elem/ tot_elem_sparse
+
+        return layer_wise_sparsity, tot_sparsity, tot_sparsity_pruned_layers
