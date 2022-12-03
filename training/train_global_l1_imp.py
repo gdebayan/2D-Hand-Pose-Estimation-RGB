@@ -26,7 +26,7 @@ from utils.prep_utils import (
 
 config = {
     "data_dir": "../data/",
-    "epochs": 1000,
+    "epochs": 1,
     "batch_size": 48,
     "batches_per_epoch": 50,
     "batches_per_epoch_val": 20,
@@ -76,7 +76,7 @@ for prune_iter in range(0, PRUNE_ITERATIONS):
     # print("layer_wise_sparsity", layer_wise_sparsity, "tot_sparsity", tot_sparsity, "tot_sparsity_pruned_layers", tot_sparsity_pruned_layers)
     print("tot_sparsity", tot_sparsity, "tot_sparsity_pruned_layers", tot_sparsity_pruned_layers)
 
-    ckpt_save_path='../checkpoints/{PRUNE_TYPE}/iter_{prune_iter}'
+    ckpt_save_path=f'../checkpoints/{PRUNE_TYPE}/iter_{prune_iter}'
     trainer = Trainer(model, criterion, optimizer, config, ckpt_save_path)
     model = trainer.train(train_dataloader, val_dataloader) 
 

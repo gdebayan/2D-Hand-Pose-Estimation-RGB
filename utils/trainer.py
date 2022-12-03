@@ -56,11 +56,15 @@ class Trainer:
 
             save_path = f"{self.ckpt_save_path}/epoch_{epoch}"
             
+            scheduler_state_dict = None
+            if self.scheduler:
+                scheduler_state_dict = self.scheduler.state_dict()
+
             torch.save({
             'epoch': epoch,
             'model_state_dict': self.model.state_dict(),
             'optimizer_state_dict': self.optimizer.state_dict(),
-            'scheduler_state_dict': self.scheduler.state_dict(),
+            'scheduler_state_dict': scheduler_state_dict,
             'train_loss_list': self.loss["train"],
             'val_loss_list':self.loss["val"]
             },  save_path)
