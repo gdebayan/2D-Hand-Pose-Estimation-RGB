@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.utils.prune as prune
 import re
+import os
 
 class PruneUtils:
 
@@ -29,13 +30,17 @@ class PruneUtils:
                                         prune_type,
                                         module_types=[nn.Linear, nn.Conv2d],
                                         permanent_prune_remove=False):
+        module_prune_list = []
         for name, module in model.named_modules():
             for module_type in module_types:
                 if isinstance(module, module_type):
                     self.apply_sparsity_module(module=module, prune_type=prune_type, sparsity_level=sparsity_level)
-                    if permanent_prune_remove:
-                        prune.remove(module, 'weight')
-        return model
+                    module_prune_list.append([module, 'weight'])
+
+        if permanent_prune_remove:
+            self._apply_prune_remove(module_prune_list)
+            
+        return model, module_prune_list
 
     ##########################
     # Global pruning methods #
@@ -89,12 +94,31 @@ class PruneUtils:
                                   amount=sparsity_level)
 
         if permanent_prune_remove:
-              for p in parameters_to_prune:
-                # p takes the form (module, 'weight')
-                prune.remove(*p)
+            self._apply_prune_remove(parameters_to_prune)
 
-        return model
+        return model, parameters_to_prune
 
+
+    def _apply_prune_remove(self, parameters_to_prune):
+        for p in parameters_to_prune:
+            # p takes the form (module, 'weight')
+            prune.remove(*p)
+
+
+    def calculate_model_size(self, model):
+        sd = model.state_dict()
+
+        for item in sd:
+            sd[item] = model.state_dict()[item].to_sparse()
+
+        torch.save(sd, "pruned_model.pt")
+        print(f'{os.path.getsize("pruned_model.pt")/1e6} MB')
+
+        size_mb = os.path.getsize("pruned_model.pt")/1e6
+
+        os.remove("pruned_model.pt")
+        return size_mb
+        
 
 class SparsityCalculator:
 

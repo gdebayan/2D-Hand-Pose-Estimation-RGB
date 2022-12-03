@@ -4,7 +4,7 @@ import os
 
 
 class Trainer:
-    def __init__(self, model, criterion, optimizer, config, ckpt_save_path='../checkpoints', scheduler=None):
+    def __init__(self, model, criterion, optimizer, config, ckpt_save_path=None, scheduler=None):
         self.model = model
         self.criterion = criterion
         self.optimizer = optimizer
@@ -20,7 +20,8 @@ class Trainer:
         self.early_stopping_precision = 5
         self.ckpt_save_path = ckpt_save_path
 
-        os.makedirs(self.ckpt_save_path, exist_ok=True)
+        if self.ckpt_save_path:
+            os.makedirs(self.ckpt_save_path, exist_ok=True)
 
 
     def train(self, train_dataloader, val_dataloader, load_chkpt=None):
@@ -54,20 +55,22 @@ class Trainer:
                 self.scheduler.step(self.loss["train"][-1])
 
 
-            save_path = f"{self.ckpt_save_path}/epoch_{epoch}"
-            
-            scheduler_state_dict = None
-            if self.scheduler:
-                scheduler_state_dict = self.scheduler.state_dict()
+            if self.ckpt_save_path:
+                save_path = f"{self.ckpt_save_path}/epoch_{epoch}"
 
-            torch.save({
-            'epoch': epoch,
-            'model_state_dict': self.model.state_dict(),
-            'optimizer_state_dict': self.optimizer.state_dict(),
-            'scheduler_state_dict': scheduler_state_dict,
-            'train_loss_list': self.loss["train"],
-            'val_loss_list':self.loss["val"]
-            },  save_path)
+                scheduler_state_dict = None
+                
+                if self.scheduler:
+                    scheduler_state_dict = self.scheduler.state_dict()
+                
+                torch.save({
+                'epoch': epoch,
+                'model_state_dict': self.model.state_dict(),
+                'optimizer_state_dict': self.optimizer.state_dict(),
+                'scheduler_state_dict': scheduler_state_dict,
+                'train_loss_list': self.loss["train"],
+                'val_loss_list':self.loss["val"]
+                },  save_path)
 
             # early stopping
             if epoch < self.early_stopping_avg:
