@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.nn.utils.prune as prune
 import re
 import os
+import copy
 
 class PruneUtils:
 
@@ -98,6 +99,9 @@ class PruneUtils:
 
         return model, parameters_to_prune
 
+    #################
+    # General Tools #
+    #################
 
     def _apply_prune_remove(self, parameters_to_prune):
         for p in parameters_to_prune:
@@ -118,6 +122,46 @@ class PruneUtils:
 
         os.remove("pruned_model.pt")
         return size_mb
+
+    def _rewind_load_prev_weights(self, model, rewind_ckpt):
+                
+        init_ckpt = torch.load(rewind_ckpt)
+        
+        # Pre-Trained (Rewind) model weights
+        init_weights = init_ckpt['model_state_dict']
+        
+        # Current model weights (with weightes_orig)
+        model_sd_copy = copy.deepcopy(model.state_dict())
+
+        model_sd_copy_keys = model_sd_copy.keys()
+        ref_orig_weights_to_replace = []
+
+        for key in model_sd_copy_keys:
+            if 'weight_orig' not in key:
+                continue
+            key_split = key.split('.')[:-1]
+            key_mod = '.'.join(key_split)
+
+            ref_orig_weights_to_replace.append(key_mod)
+
+        init_updated = {}
+        for k, v in init_weights.items():
+
+            k_split = k.split('.')[:-1]
+            k_mod = '.'.join(k_split)
+            
+            if k_mod not in ref_orig_weights_to_replace:
+                init_updated[k] = v
+                continue
+
+            k_new = k + '_orig'
+            init_updated[k_new] = v
+
+        # Update Model Weights
+        model_sd_copy.update(init_updated)
+        model.load_state_dict(model_sd_copy)
+
+        return model
         
 
 class SparsityCalculator:
