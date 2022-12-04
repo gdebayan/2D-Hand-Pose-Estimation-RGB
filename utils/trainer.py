@@ -4,7 +4,7 @@ import os
 
 
 class Trainer:
-    def __init__(self, model, criterion, optimizer, config, ckpt_save_path=None, scheduler=None):
+    def __init__(self, model, criterion, optimizer, config, ckpt_save_path=None, scheduler=None, model_type='baseline'):
         self.model = model
         self.criterion = criterion
         self.optimizer = optimizer
@@ -19,6 +19,7 @@ class Trainer:
         self.early_stopping_avg = 10
         self.early_stopping_precision = 5
         self.ckpt_save_path = ckpt_save_path
+        self.model_type = model_type
 
         if self.ckpt_save_path:
             os.makedirs(self.ckpt_save_path, exist_ok=True)
@@ -64,12 +65,12 @@ class Trainer:
                     scheduler_state_dict = self.scheduler.state_dict()
                 
                 torch.save({
-                'epoch': epoch,
-                'model_state_dict': self.model.state_dict(),
-                'optimizer_state_dict': self.optimizer.state_dict(),
-                'scheduler_state_dict': scheduler_state_dict,
-                'train_loss_list': self.loss["train"],
-                'val_loss_list':self.loss["val"]
+                    'epoch': epoch,
+                    'model_state_dict': self.model.state_dict(),
+                    'optimizer_state_dict': self.optimizer.state_dict(),
+                    'scheduler_state_dict': scheduler_state_dict,
+                    'train_loss_list': self.loss["train"],
+                    'val_loss_list':self.loss["val"]
                 },  save_path)
 
             # early stopping
@@ -102,7 +103,7 @@ class Trainer:
 
         for i, data in enumerate(dataloader, 0):
             inputs = data["image"].to(self.device)
-            labels = data["heatmaps"].to(self.device)
+            labels = data["heatmaps"].to(self.device) if self.model_type == 'baseline' else data["keypoints"].to(self.device)
 
             self.optimizer.zero_grad()
 
@@ -125,7 +126,7 @@ class Trainer:
         with torch.no_grad():
             for i, data in enumerate(dataloader, 0):
                 inputs = data["image"].to(self.device)
-                labels = data["heatmaps"].to(self.device)
+                labels = data["heatmaps"].to(self.device) if self.model_type == 'baseline' else data["keypoints"].to(self.device)
 
                 outputs = self.model(inputs)
                 loss = self.criterion(outputs, labels)
