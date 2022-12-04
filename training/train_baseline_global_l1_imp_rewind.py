@@ -110,7 +110,9 @@ for prune_iter in range(0, PRUNE_ITERATIONS):
 
     print("tot_sparsity", tot_sparsity, "tot_sparsity_pruned_layers", tot_sparsity_pruned_layers, "size_mb", size_mb)
 
-    optimizer = optim.SGD(model.parameters(), lr=config["learning_rate"])
+    # optimizer = optim.SGD(model.parameters(), lr=config["learning_rate"])
+    del trainer
+    torch.cuda.empty_cache()
     trainer = Trainer(model, criterion, optimizer, config)
     model = trainer.train(train_dataloader, val_dataloader) 
 
