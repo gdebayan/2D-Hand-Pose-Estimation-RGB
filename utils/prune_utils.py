@@ -150,7 +150,7 @@ class PruneUtils:
             k_split = k.split('.')[:-1]
             k_mod = '.'.join(k_split)
             
-            if k_mod not in ref_orig_weights_to_replace:
+            if k_mod not in ref_orig_weights_to_replace or 'weight' not in k:
                 init_updated[k] = v
                 continue
 
