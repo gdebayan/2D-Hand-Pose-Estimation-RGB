@@ -162,6 +162,16 @@ class PruneUtils:
         model.load_state_dict(model_sd_copy)
 
         return model
+
+    def sparse_apply(self, model):
+        sd = model.state_dict()
+        # print(sd)
+        for item in sd:
+            # print("item", item[0])
+                # if 'weight' in item: # shortcut, this assumes you pruned (and removed reparameterization for) all weight parameters
+            #     print("sparsifying", item)
+            sd[item] = model.state_dict()[item].to_sparse()
+        return model
         
 
 class SparsityCalculator:
