@@ -1,7 +1,11 @@
 import numpy as np
 import torch
 import os
-from evaluator import Evaluator
+
+import sys
+sys.path.append("../")
+
+from utils.evaluator import Evaluator
 
 
 class TrainerDistillation:
@@ -42,7 +46,10 @@ class TrainerDistillation:
 
         self.teacher_model = teacher_model
         self.teacher_model = self._freeze_model_layers(self.teacher_model)
-        print("Teacher Model", self.teacher_model)
+
+            
+
+
 
     
     def _freeze_model_layers(self, model):
@@ -109,7 +116,7 @@ class TrainerDistillation:
                     'val_distill_loss_list': self.distill_loss["val"],
                     'train_student_loss_list': self.student_loss["train"],
                     'val_student_loss_list': self.student_loss["val"],
-                    'val RMSE'
+                    'val RMSE': self.test_rmse[-1]
                 },  save_path)
 
             # early stopping
@@ -137,6 +144,10 @@ class TrainerDistillation:
         return self.model
 
     def _epoch_train(self, dataloader):
+
+        self.model = self.model.to(self.device)
+        self.teacher_model = self.teacher_model.to(self.device)
+
         self.model.train()
         running_loss = []
         running_distill_loss = []
@@ -152,7 +163,7 @@ class TrainerDistillation:
             y_student = self.model(inputs)
 
             loss_distill = self.distill_criterion(y_teacher, y_student)
-            loss_student = self.student_criterion(outputs, labels)
+            loss_student = self.student_criterion(y_student, labels)
 
             total_loss = loss_distill + self.alpha_loss * loss_student
 
@@ -174,6 +185,10 @@ class TrainerDistillation:
                 break
 
     def _epoch_eval(self, dataloader):
+
+        self.model = self.model.to(self.device)
+        self.teacher_model = self.teacher_model.to(self.device)
+
         self.model.eval()
         running_loss = []
         running_distill_loss = []
@@ -188,7 +203,7 @@ class TrainerDistillation:
                 y_student = self.model(inputs)
 
                 loss_distill = self.distill_criterion(y_teacher, y_student)
-                loss_student = self.student_criterion(outputs, labels)
+                loss_student = self.student_criterion(y_student, labels)
 
                 total_loss = loss_distill + self.alpha_loss * loss_student
 

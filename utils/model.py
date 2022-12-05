@@ -69,7 +69,7 @@ class ShallowUNet(nn.Module):
         return out
 
 
-class StudentShallowNet:
+class StudentShallowNet(nn.Module):
     """
     Implementation of UNet, slightly modified:
     - less downsampling blocks

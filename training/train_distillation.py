@@ -67,7 +67,7 @@ teacher_model.load_state_dict(teacher_ckpt["model_state_dict"])
 
 distill_criterion = nn.MSELoss()
 student_criterion = IoULoss()
-alpha_loss = 0.6
+alpha_loss = 0.04
 
 optimizer = optim.SGD(model.parameters(), lr=config["learning_rate"])
 scheduler = optim.lr_scheduler.ReduceLROnPlateau(
