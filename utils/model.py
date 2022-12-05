@@ -67,3 +67,42 @@ class ShallowUNet(nn.Module):
 
         out = self.conv_out(conv_u3)
         return out
+
+
+class StudentShallowNet:
+    """
+    Implementation of UNet, slightly modified:
+    - less downsampling blocks
+    - less neurons in the layers
+    - Batch Normalization added
+    
+    Link to paper on original UNet:
+    https://arxiv.org/abs/1505.04597
+    """
+    
+    def __init__(self, in_channel, out_channel):
+        super().__init__()
+
+        self.conv_down1 = ConvBlock(in_channel, MODEL_NEURONS)
+        self.conv_bottleneck = ConvBlock(MODEL_NEURONS, MODEL_NEURONS * 2)
+
+        self.maxpool = nn.MaxPool2d(2)
+        self.upsamle = nn.Upsample(scale_factor=2, mode="bilinear", align_corners=False)
+
+        self.conv_up1 = ConvBlock(
+            MODEL_NEURONS + MODEL_NEURONS * 2, MODEL_NEURONS
+        )
+
+        self.conv_out = nn.Sequential(
+            nn.Conv2d(MODEL_NEURONS, out_channel, kernel_size=3, padding=1, bias=False),
+            nn.Sigmoid(),
+        )
+
+    def forward(self, x):
+        conv_d1 = self.conv_down1(x)
+        conv_b = self.conv_bottleneck(self.maxpool(conv_d1))
+
+        conv_u1 = self.conv_up1(torch.cat([self.upsamle(conv_b), conv_d1], dim=1))
+
+        out = self.conv_out(conv_u1)
+        return out

@@ -86,7 +86,7 @@ prune_cls = PruneUtils()
 
 PRUNE_ITERATIONS = 10
 
-PRUNE_TYPE = 'baseline_global_l1_no_rewind'
+PRUNE_TYPE = 'baseline_layer_wise_l1_no_rewind'
 CKPT_SAVE_PATH=f'../checkpoints/{PRUNE_TYPE}'
 os.makedirs(CKPT_SAVE_PATH, exist_ok=True)
 
@@ -102,9 +102,9 @@ for prune_iter in range(0, PRUNE_ITERATIONS):
     if os.path.exists(prev_iter_ckpt):
         model = torch.load(prev_iter_ckpt)
 
-    model, pruned_params_list = prune_cls.apply_sparsity_global(model=model, 
+    model, pruned_params_list = prune_cls.apply_sparsity_layer_wise(model=model, 
                                                                 sparsity_level=0.2, 
-                                                                prune_type='l1_unstructred', 
+                                                                prune_type='l1', 
                                                                 permanent_prune_remove=False)
 
     layer_wise_sparsity, tot_sparsity, tot_sparsity_pruned_layers = SparsityCalculator.calculate_sparsity_pruned_model(model)

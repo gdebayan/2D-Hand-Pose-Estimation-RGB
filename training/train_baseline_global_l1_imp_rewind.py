@@ -13,6 +13,7 @@ from utils.dataset import FreiHAND
 from utils.model import ShallowUNet
 from utils.trainer import Trainer
 from utils.prune_utils import PruneUtils, SparsityCalculator
+from utils.evaluator import Evaluator
 
 from utils.prep_utils import (
     blur_heatmaps,
@@ -32,6 +33,7 @@ config = {
     "batches_per_epoch": 50,
     "batches_per_epoch_val": 20,
     "learning_rate": 0.1,
+    "test_batch_size": 1,
     "device": torch.device("cuda" if torch.cuda.is_available() else "cpu"),
 }
 
@@ -47,6 +49,15 @@ train_dataloader = DataLoader(
 val_dataset = FreiHAND(config=config, set_type="val")
 val_dataloader = DataLoader(
     val_dataset, config["batch_size"], shuffle=True, drop_last=True, num_workers=2
+)
+
+test_dataset = FreiHAND(config=config, set_type="test")
+test_dataloader = DataLoader(
+    test_dataset,
+    config["test_batch_size"],
+    shuffle=True,
+    drop_last=False,
+    num_workers=2,
 )
 
 ##################################
@@ -72,15 +83,17 @@ scheduler=None
 
 prune_cls = PruneUtils()
 
-PRUNE_ITERATIONS = 20
+PRUNE_ITERATIONS = 10
 
-PRUNE_TYPE = 'global_l1_with_rewind'
+PRUNE_TYPE = 'baseline_global_l1_with_rewind'
 CKPT_SAVE_PATH=f'../checkpoints/{PRUNE_TYPE}'
 os.makedirs(CKPT_SAVE_PATH, exist_ok=True)
 
 ###################
 # Perform Pruning #
 ###################
+
+info_list = []
 
 for prune_iter in range(0, PRUNE_ITERATIONS):
 
@@ -108,13 +121,29 @@ for prune_iter in range(0, PRUNE_ITERATIONS):
     # Calculate Size after "sparsifying" the weights
     size_mb = prune_cls.calculate_model_size(model)
 
-    print("tot_sparsity", tot_sparsity, "tot_sparsity_pruned_layers", tot_sparsity_pruned_layers, "size_mb", size_mb)
-
-    # optimizer = optim.SGD(model.parameters(), lr=config["learning_rate"])
-    del trainer
+    optimizer = optim.SGD(model.parameters(), lr=config["learning_rate"])
     torch.cuda.empty_cache()
     trainer = Trainer(model, criterion, optimizer, config)
     model = trainer.train(train_dataloader, val_dataloader) 
+
+    rmse, exec_time_avg = Evaluator.inference_fwd_baseline(model, test_dataloader)
+
+    info_list.append({'prune_iter': prune_iter,
+                      'tot_sparsity': tot_sparsity, 
+                      'tot_sparsity_pruned_layers': tot_sparsity_pruned_layers,
+                      'size_mb': size_mb,
+                      'iou_train_loss': trainer.loss['train'][-1],
+                      'iou_val_loss': trainer.loss['val'][-1],
+                      'test_rmse': rmse,
+                      'exec_time_avg': exec_time_avg})
+    print(prune_iter, "rmse", rmse, "tot_sparsity", tot_sparsity, "tot_sparsity_pruned_layers", tot_sparsity_pruned_layers, "size_mb", size_mb)
+
+import pandas as pd
+df = pd.DataFrame(info_list)
+# df.head()
+
+
+df.to_csv(f'{CKPT_SAVE_PATH}/{PRUNE_TYPE}.csv')  
 
 
 

@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 import os
+from evaluator import Evaluator
 
 
 class TrainerDistillation:
@@ -23,6 +24,7 @@ class TrainerDistillation:
         self.distill_loss = {"train": [], "val": []}
         self.student_loss = {"train": [], "val": []}
         self.total_loss   = {"train": [], "val": []}
+        self.test_rmse = []
 
         self.epochs = config["epochs"]
         self.batches_per_epoch = config["batches_per_epoch"]
@@ -48,7 +50,7 @@ class TrainerDistillation:
             param.requires_grad = False
         return model
 
-    def train(self, train_dataloader, val_dataloader, load_chkpt=None):
+    def train(self, train_dataloader, val_dataloader, test_dataloader, load_chkpt=None):
         
         start_epoch = 0
 
@@ -65,18 +67,27 @@ class TrainerDistillation:
         for epoch in range(start_epoch, self.epochs):
             self._epoch_train(train_dataloader)
             self._epoch_eval(val_dataloader)
+
+            rmse, exec_time_avg = Evaluator.inference_fwd_baseline(self.model, test_dataloader)
+            self.test_rmse.append(rmse)
+
             print(
-                "Epoch: {}/{}, Train Loss={}, Val Loss={}".format(
+                "Epoch: {}/{}, Train Loss={}, Val Loss={}, Train Distill Loss={},  Val Distill Loss={}, Train Student Loss={}, Val Student Loss={}, Test RMSE={}".format(
                     epoch + 1,
                     self.epochs,
-                    np.round(self.loss["train"][-1], 10),
-                    np.round(self.loss["val"][-1], 10),
+                    np.round(self.total_loss["train"][-1], 10),
+                    np.round(self.total_loss["val"][-1], 10),
+                    np.round(self.distill_loss["train"][-1], 10),
+                    np.round(self.distill_loss["val"][-1], 10),
+                    np.round(self.student_loss["train"][-1], 10),
+                    np.round(self.student_loss["val"][-1], 10),
+                    self.test_rmse[-1]
                 )
             )
 
             # reducing LR if no improvement
             if self.scheduler is not None:
-                self.scheduler.step(self.loss["train"][-1])
+                self.scheduler.step(self.total_loss["train"][-1])
 
 
             if self.ckpt_save_path:
@@ -92,18 +103,23 @@ class TrainerDistillation:
                     'model_state_dict': self.model.state_dict(),
                     'optimizer_state_dict': self.optimizer.state_dict(),
                     'scheduler_state_dict': scheduler_state_dict,
-                    'train_loss_list': self.loss["train"],
-                    'val_loss_list':self.loss["val"]
+                    'train_loss_list': self.total_loss["train"],
+                    'val_loss_list':self.total_loss["val"],
+                    'train_distill_loss_list': self.distill_loss["train"],
+                    'val_distill_loss_list': self.distill_loss["val"],
+                    'train_student_loss_list': self.student_loss["train"],
+                    'val_student_loss_list': self.student_loss["val"],
+                    'val RMSE'
                 },  save_path)
 
             # early stopping
             if epoch < self.early_stopping_avg:
-                min_val_loss = np.round(np.mean(self.loss["val"]), self.early_stopping_precision)
+                min_val_loss = np.round(np.mean(self.total_loss["val"]), self.early_stopping_precision)
                 no_decrease_epochs = 0
 
             else:
                 val_loss = np.round(
-                    np.mean(self.loss["val"][-self.early_stopping_avg:]), 
+                    np.mean(self.total_loss["val"][-self.early_stopping_avg:]), 
                                     self.early_stopping_precision
                 )
                 if val_loss >= min_val_loss:
@@ -123,47 +139,69 @@ class TrainerDistillation:
     def _epoch_train(self, dataloader):
         self.model.train()
         running_loss = []
+        running_distill_loss = []
+        running_student_loss = []
 
-        self.parent_model.eval() # Weights are frozen anyways
+        self.teacher_model.eval() # Weights are frozen anyways
 
         for i, data in enumerate(dataloader, 0):
             inputs = data["image"].to(self.device)
             labels = data["heatmaps"].to(self.device)
 
-            y_teacher = self.parent_model(inputs)
+            y_teacher = self.teacher_model(inputs)
             y_student = self.model(inputs)
 
             loss_distill = self.distill_criterion(y_teacher, y_student)
-            loss_
+            loss_student = self.student_criterion(outputs, labels)
 
+            total_loss = loss_distill + self.alpha_loss * loss_student
 
-            # outputs = self.model(inputs)
-            loss = self.criterion(outputs, labels)
-            loss.backward()
+            total_loss.backward()
             self.optimizer.step()
 
-            running_loss.append(loss.item())
+            running_loss.append(total_loss.item())
+            running_distill_loss.append(loss_distill.item())
+            running_student_loss.append(loss_student.item())
 
             if i == self.batches_per_epoch:
                 epoch_loss = np.mean(running_loss)
-                self.loss["train"].append(epoch_loss)
+                epoch_distill_loss = np.mean(running_distill_loss)
+                epoch_student_loss = np.mean(running_student_loss)
+
+                self.total_loss["train"].append(epoch_loss)
+                self.distill_loss["train"].append(epoch_distill_loss)
+                self.student_loss["train"].append(epoch_student_loss)
                 break
 
     def _epoch_eval(self, dataloader):
         self.model.eval()
         running_loss = []
-
+        running_distill_loss = []
+        running_student_loss = []
+        
         with torch.no_grad():
             for i, data in enumerate(dataloader, 0):
                 inputs = data["image"].to(self.device)
-                labels = data["heatmaps"].to(self.device) if self.model_type == 'baseline' else data["keypoints"].to(self.device)
+                labels = data["heatmaps"].to(self.device)
 
-                outputs = self.model(inputs)
-                loss = self.criterion(outputs, labels)
+                y_teacher = self.teacher_model(inputs)
+                y_student = self.model(inputs)
 
-                running_loss.append(loss.item())
+                loss_distill = self.distill_criterion(y_teacher, y_student)
+                loss_student = self.student_criterion(outputs, labels)
 
-                if i == self.batches_per_epoch_val:
+                total_loss = loss_distill + self.alpha_loss * loss_student
+
+                running_loss.append(total_loss.item())
+                running_distill_loss.append(loss_distill.item())
+                running_student_loss.append(loss_student.item())
+
+                if i == self.batches_per_epoch:
                     epoch_loss = np.mean(running_loss)
-                    self.loss["val"].append(epoch_loss)
+                    epoch_distill_loss = np.mean(running_distill_loss)
+                    epoch_student_loss = np.mean(running_student_loss)
+
+                    self.total_loss["val"].append(epoch_loss)
+                    self.distill_loss["val"].append(epoch_distill_loss)
+                    self.student_loss["val"].append(epoch_student_loss)
                     break
