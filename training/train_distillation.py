@@ -26,7 +26,7 @@ from utils.prep_utils import (
 
 config = {
     "data_dir": "../data/",
-    "epochs": 1000,
+    "epochs": 200,
     "batch_size": 48,
     "batches_per_epoch": 50,
     "batches_per_epoch_val": 20,
@@ -67,14 +67,14 @@ teacher_model.load_state_dict(teacher_ckpt["model_state_dict"])
 
 distill_criterion = IoULoss() #nn.MSELoss()
 student_criterion = IoULoss()
-alpha_loss = 1.0
+alpha_loss = 0.8
 
 optimizer = optim.SGD(model.parameters(), lr=config["learning_rate"])
 scheduler = optim.lr_scheduler.ReduceLROnPlateau(
     optimizer=optimizer, factor=0.5, patience=20, verbose=True, threshold=0.00001
 )
 
-ckpt_save_path = '../checkpoints_model_distilation_iou_criterion'
+ckpt_save_path = f'../checkpoints_model_distilation_iou_criterion_{alpha_loss}'
 
 trainer = TrainerDistillation(model, 
                               teacher_model,
@@ -87,5 +87,5 @@ trainer = TrainerDistillation(model,
                               scheduler)
 
 # trainer = Trainer(model, criterion, optimizer, config, scheduler)
-model = trainer.train(train_dataloader, val_dataloader, test_dataloader, '../checkpoints_model_distilation_iou_criterion/epoch_17') 
+model = trainer.train(train_dataloader, val_dataloader, test_dataloader) 
 

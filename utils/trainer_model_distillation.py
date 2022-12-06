@@ -171,7 +171,7 @@ class TrainerDistillation:
             loss_distill = self.distill_criterion(y_teacher, y_student)
             loss_student = self.student_criterion(y_student, labels)
 
-            total_loss = loss_distill + self.alpha_loss * loss_student
+            total_loss = (1 - self.alpha_loss)*loss_distill + self.alpha_loss * loss_student
             # total_loss = loss_student
 
             total_loss.backward()
