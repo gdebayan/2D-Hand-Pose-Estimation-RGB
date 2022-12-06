@@ -4,6 +4,8 @@ import torch.nn.utils.prune as prune
 import re
 import os
 import copy
+from torch.ao.quantization import get_default_qconfig
+from torch.quantization.quantize_fx import prepare_fx, convert_fx
 
 class PruneUtils:
 
@@ -224,3 +226,45 @@ class SparsityCalculator:
         tot_sparsity_pruned_layers = num_sparse_elem/ tot_elem_sparse
 
         return layer_wise_sparsity, tot_sparsity, tot_sparsity_pruned_layers
+
+
+class QuantizationUtils:
+
+    def __init__(self):
+        pass
+
+    @staticmethod
+    def dynamic_quantization(model, layers={nn.Linear, nn.Conv2d}):
+        model_quantized = torch.quantization.quantize_dynamic(
+            model, layers, dtype=torch.qint8
+            )
+        return model_quantized
+
+    @staticmethod
+    def calibrate(model, data_loader):
+        model.eval()
+        with torch.no_grad():
+            for i, data in enumerate(data_loader, 0):
+                inputs = data["image"].to('cpu')
+                labels = data["heatmaps"].to('cpu')
+                model(inputs)
+        return model
+
+    @staticmethod
+    def static_quantize_model(model, data_loader):
+        model=model.to('cpu')
+        model.eval()
+        qconfig = get_default_qconfig('fbgemm')
+        qconfig_dict = {"": qconfig}
+        prepared_model = prepare_fx(model, qconfig_dict)
+        quantized_model = QuantizationUtils.calibrate(prepared_model, data_loader)
+        quantized_model = convert_fx(quantized_model)
+        return quantized_model
+
+    @staticmethod
+    def get_size_of_model(model, label=""):
+        torch.save(model.state_dict(), "temp.p")
+        size=os.path.getsize("temp.p")
+        print("model: ",label,' \t','Size (MB):', size/1e6)
+        os.remove('temp.p')
+        return size/1e6
