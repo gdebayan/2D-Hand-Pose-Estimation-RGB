@@ -118,8 +118,9 @@ def heatmaps_to_coordinates(heatmaps):
     """
     batch_size = heatmaps.shape[0]
     sums = heatmaps.sum(axis=-1).sum(axis=-1)
+    # print("sums", sums)
     sums = np.expand_dims(sums, [2, 3])
-    normalized = heatmaps / sums
+    normalized = heatmaps / (sums + 1e-10)
     x_prob = normalized.sum(axis=2)
     y_prob = normalized.sum(axis=3)
 

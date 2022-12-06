@@ -30,7 +30,7 @@ config = {
     "batch_size": 48,
     "batches_per_epoch": 50,
     "batches_per_epoch_val": 20,
-    "learning_rate": 0.1,
+    "learning_rate": 0.01,
     "device": torch.device("cuda" if torch.cuda.is_available() else "cpu"),
 }
 
@@ -65,16 +65,16 @@ teacher_ckpt = torch.load(TEACHER_MODEL_PATH)
 teacher_model.load_state_dict(teacher_ckpt["model_state_dict"])
 
 
-distill_criterion = nn.MSELoss()
+distill_criterion = IoULoss() #nn.MSELoss()
 student_criterion = IoULoss()
-alpha_loss = 0.04
+alpha_loss = 1.0
 
 optimizer = optim.SGD(model.parameters(), lr=config["learning_rate"])
 scheduler = optim.lr_scheduler.ReduceLROnPlateau(
     optimizer=optimizer, factor=0.5, patience=20, verbose=True, threshold=0.00001
 )
 
-ckpt_save_path = '../checkpoints_model_distilation'
+ckpt_save_path = '../checkpoints_model_distilation_iou_criterion'
 
 trainer = TrainerDistillation(model, 
                               teacher_model,
@@ -87,5 +87,5 @@ trainer = TrainerDistillation(model,
                               scheduler)
 
 # trainer = Trainer(model, criterion, optimizer, config, scheduler)
-model = trainer.train(train_dataloader, val_dataloader, test_dataloader) 
+model = trainer.train(train_dataloader, val_dataloader, test_dataloader, '../checkpoints_model_distilation_iou_criterion/epoch_17') 
 

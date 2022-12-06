@@ -61,6 +61,9 @@ class TrainerDistillation:
         
         start_epoch = 0
 
+        rmse_teacher, exec_time_avg = Evaluator.inference_fwd_baseline(self.teacher_model, test_dataloader)
+        print("RMSE TEACHER BEFORE TRAINING", rmse_teacher)
+
         if load_chkpt:
             checkpoint = torch.load(load_chkpt)
             self.model.load_state_dict(checkpoint['model_state_dict'])
@@ -76,10 +79,12 @@ class TrainerDistillation:
             self._epoch_eval(val_dataloader)
 
             rmse, exec_time_avg = Evaluator.inference_fwd_baseline(self.model, test_dataloader)
+            # rmse_teacher, exec_time_avg = Evaluator.inference_fwd_baseline(self.teacher_model, test_dataloader)
+
             self.test_rmse.append(rmse)
 
             print(
-                "Epoch: {}/{}, Train Loss={}, Val Loss={}, Train Distill Loss={},  Val Distill Loss={}, Train Student Loss={}, Val Student Loss={}, Test RMSE={}".format(
+                "Epoch: {}/{}, Train Loss={}, Val Loss={}, Train Distill Loss={},  Val Distill Loss={}, Train Student Loss={}, Val Student Loss={}, Test RMSE={}, Test RMSE Teacher={}".format(
                     epoch + 1,
                     self.epochs,
                     np.round(self.total_loss["train"][-1], 10),
@@ -88,7 +93,8 @@ class TrainerDistillation:
                     np.round(self.distill_loss["val"][-1], 10),
                     np.round(self.student_loss["train"][-1], 10),
                     np.round(self.student_loss["val"][-1], 10),
-                    self.test_rmse[-1]
+                    self.test_rmse[-1],
+                    rmse_teacher
                 )
             )
 
@@ -119,26 +125,26 @@ class TrainerDistillation:
                     'val RMSE': self.test_rmse[-1]
                 },  save_path)
 
-            # early stopping
-            if epoch < self.early_stopping_avg:
-                min_val_loss = np.round(np.mean(self.total_loss["val"]), self.early_stopping_precision)
-                no_decrease_epochs = 0
+            # # early stopping
+            # if epoch < self.early_stopping_avg:
+            #     min_val_loss = np.round(np.mean(self.total_loss["val"]), self.early_stopping_precision)
+            #     no_decrease_epochs = 0
 
-            else:
-                val_loss = np.round(
-                    np.mean(self.total_loss["val"][-self.early_stopping_avg:]), 
-                                    self.early_stopping_precision
-                )
-                if val_loss >= min_val_loss:
-                    no_decrease_epochs += 1
-                else:
-                    min_val_loss = val_loss
-                    no_decrease_epochs = 0
-                    #print('New min: ', min_val_loss)
+            # else:
+            #     val_loss = np.round(
+            #         np.mean(self.total_loss["val"][-self.early_stopping_avg:]), 
+            #                         self.early_stopping_precision
+            #     )
+            #     if val_loss >= min_val_loss:
+            #         no_decrease_epochs += 1
+            #     else:
+            #         min_val_loss = val_loss
+            #         no_decrease_epochs = 0
+            #         #print('New min: ', min_val_loss)
 
-            if no_decrease_epochs > self.early_stopping_epochs:
-                print("Early Stopping")
-                break
+            # if no_decrease_epochs > self.early_stopping_epochs:
+            #     print("Early Stopping")
+            #     break
 
         torch.save(self.model.state_dict(), "model_final")
         return self.model
@@ -166,6 +172,7 @@ class TrainerDistillation:
             loss_student = self.student_criterion(y_student, labels)
 
             total_loss = loss_distill + self.alpha_loss * loss_student
+            # total_loss = loss_student
 
             total_loss.backward()
             self.optimizer.step()
@@ -198,6 +205,8 @@ class TrainerDistillation:
             for i, data in enumerate(dataloader, 0):
                 inputs = data["image"].to(self.device)
                 labels = data["heatmaps"].to(self.device)
+
+                # print("heatmaps", labels)
 
                 y_teacher = self.teacher_model(inputs)
                 y_student = self.model(inputs)
